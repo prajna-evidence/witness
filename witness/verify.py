@@ -200,15 +200,20 @@ def _check_file(root: pathlib.Path, entry: dict, commit_sha: str, base_commit: "
     # `deleted` files: their content only ever lived at the base, and searching HEAD's
     # history for a path that was removed is not the same question.
     #
-    # Bounded to commits after a reachable base_commit. Unbounded, a bundle could name
-    # a commit that never existed and have any historical version of a file "match" -
-    # including content from before the change it describes. A squash commit is always
-    # a descendant of the base it was taken against, so the legitimate case survives.
-    # No reachable base (null, or itself dead) means no bound, so no recovery.
+    # A recovered hit is reported as `recovered`, never as `match`. With the named commit
+    # gone, nothing the bundle's author does not control ties the content to this change:
+    # base_commit is their claim too, so a forged bundle can pick a base that admits any
+    # historical version of the file. What recovery establishes is only that the content
+    # existed after the claimed base. Like `unverified-offline`, that is reported for what
+    # it is rather than failed or passed as checked (SPEC.md 6.1). `reconcile` records a
+    # merge_commit, which keeps the anchor live and avoids recovery altogether.
+    #
+    # Bounded to commits after a reachable base_commit, which at least stops a bundle with
+    # no base, or a dead one, from matching anything in history.
     if action != "deleted" and base_commit and gitrepo.exists(root, base_commit):
         recovered = gitrepo.find_containing_commit(root, path, expected, after=base_commit)
         if recovered:
-            return {"path": path, "action": action, "outcome": "match", "checked_at": "recovered", "commit": recovered}
+            return {"path": path, "action": action, "outcome": "recovered", "checked_at": "history", "commit": recovered}
 
     return {"path": path, "action": action, "outcome": "absent", "checked_at": anchor_kind, "commit": direct_anchor}
 
@@ -220,11 +225,15 @@ def check_content(bundle: dict, root: pathlib.Path) -> dict[str, Any]:
         for entry in bundle.get("files") or []
     ]
     matched = sum(1 for r in results if r["outcome"] == "match")
+    recovered = sum(1 for r in results if r["outcome"] == "recovered")
     return {
         "results": results,
         "matched": matched,
+        "recovered": recovered,
         "total": len(results),
-        "ok": matched == len(results),
+        # A dead locator is not a content failure (S15), so recovered claims do not fail
+        # the bundle - they are counted separately so they are never read as `matched`.
+        "ok": matched + recovered == len(results),
     }
 
 
@@ -432,7 +441,11 @@ def verify_offline(bundle: dict, root: "pathlib.Path | str") -> dict[str, Any]:
 #: closed, explicit table rather than a generic "GET retrievable_from and diff" -
 #: what "confirmed" means is specific to the claim shape of each source, and guessing
 #: at that generically is how a verifier starts reporting false confirmations.
-OnlineVerifier = Callable[[dict, dict], dict]
+#: Called as `fn(source, bundle, subject_repo)`, where `subject_repo` is the github.com
+#: `owner/name` of the checkout being verified (or None) - read from the verifier's own
+#: clone, never from the bundle, so a locator can be bound to something the bundle's
+#: author does not control.
+OnlineVerifier = Callable[[dict, dict, "str | None"], dict]
 ONLINE_VERIFIERS: "dict[tuple[str, str], OnlineVerifier]" = {}
 
 
@@ -454,7 +467,7 @@ def _register_builtin_online_verifiers() -> None:
     ONLINE_VERIFIERS.setdefault(("github-actions", "attestation"), _github_actions_online_verify)
 
 
-def _online_check_source(source: dict, bundle: dict) -> dict[str, Any]:
+def _online_check_source(source: dict, bundle: dict, subject_repo: "str | None") -> dict[str, Any]:
     if source.get("tier") != tiers.TIER_HOST_ATTESTED:
         return {"skipped": "not tier B"}
     if not source.get("retrievable_from"):
@@ -464,7 +477,7 @@ def _online_check_source(source: dict, bundle: dict) -> dict[str, Any]:
     if verifier is None:
         return {"outcome": "unreachable", "reason": f"no online verifier registered for {key[0]}:{key[1]}"}
     try:
-        return verifier(source, bundle)
+        return verifier(source, bundle, subject_repo)
     except Exception as exc:  # noqa: BLE001 - a re-fetch failing must degrade, never crash verify
         return {"outcome": "unreachable", "reason": f"re-fetch failed: {exc}"}
 
@@ -478,8 +491,9 @@ def verify_online(bundle: dict, root: "pathlib.Path | str") -> dict[str, Any]:
     """
     _register_builtin_online_verifiers()
     report = verify_offline(bundle, root)
+    subject_repo = gitrepo.github_repo(gitrepo.remote_url(pathlib.Path(root)))
     online = [
-        {"source": {"host": s.get("host"), "channel": s.get("channel")}, **_online_check_source(s, bundle)}
+        {"source": {"host": s.get("host"), "channel": s.get("channel")}, **_online_check_source(s, bundle, subject_repo)}
         for s in bundle.get("sources") or []
         if s.get("tier") == tiers.TIER_HOST_ATTESTED
     ]

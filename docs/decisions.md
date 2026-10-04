@@ -633,3 +633,25 @@ has a remote, so every bundle from a real repository failed verification. No tes
 remote. The pattern is widened to `^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)?$`. That is additive under
 §9: every value the old pattern accepted is still accepted.
 
+## S23 — S22's two bindings trusted the bundle; bind to the checkout, and label recovery
+
+**Status:** locked, 2026-10-04. **Amends** S22 items 2 and 3, and S15. Normative in `SPEC.md` §6.1, §6.2.
+
+A security review of S22's fixes found that both used a value the bundle's author writes. Both were
+reproduced before fixing:
+
+1. **Online binding read `repo.remote` from the bundle.** A forger names their own repository as the
+   remote as well as the locator, and the claim was confirmed again. The subject is now the github.com
+   `owner/name` of the checkout's own `origin` (`gitrepo.github_repo`, which also refuses non-GitHub
+   hosts). A bundle naming a different repository than the checkout cannot be bound, so it is
+   `unreachable`, not `contradicted`: a fork clone gets there honestly.
+2. **The recovery bound used `base_commit`, which is also the author's claim.** Pointing it at an early
+   commit admitted old content. That cannot be closed: once the named commit is gone, nothing tamper-proof
+   ties history to this change. So a recovered hit is now its own outcome, `recovered`, counted apart
+   from `matched` and printed as weaker. As with `unverified-offline`, it is reported for what it is.
+   It does not fail the bundle, which keeps S15's promise that a dead locator is not a content failure.
+   `witness reconcile` (a live `merge_commit`) is the way to avoid recovery.
+
+**The rule both mistakes broke, stated so it is not broken a third time:** a verifier may only bind a
+claim to something the subject does not control. Anything inside the bundle is the subject's testimony.
+

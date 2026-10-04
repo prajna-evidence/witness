@@ -243,7 +243,8 @@ mode: offline
   schema        ok
   locator commit_sha    reachable  919bc6a9de28437309f5116671ed58d6a6f9b193
   locator base_commit   reachable  91f13928317186ed17b0288688ab6152c7b28beb
-  content       1/1 file claims re-verified
+  content       0/1 file claims re-verified at an anchor
+                  1 recovered from history: the content existed after the claimed base, but no live anchor ties it to this change (run `witness reconcile`)
   tier_floor    declared=C computed=C ok
   unavailable   ok
   chain (tier A) not applicable
@@ -270,8 +271,10 @@ mode: offline
 PASS
 ```
 
-The locator died; the content claim recovered from history (`gitrepo.find_containing_commit`)
-and still matched; the bundle still passes. **A dead locator must never surface as a content
+The locator died; the content was found again in history after the base
+(`gitrepo.find_containing_commit`) and is reported as `recovered`, not matched: with the named
+commit gone, nothing the bundle's author does not control ties that content to this change
+(decision S23). The bundle still passes. Run `witness reconcile` after merging to keep a live anchor. **A dead locator must never surface as a content
 failure** — `witness/verify.py`'s test suite pins this directly
 (`test_a_dead_locator_never_surfaces_as_a_content_failure`).
 
@@ -306,7 +309,7 @@ longer a separate hand-rolled path for checking a bundle you produced yourself.
 ## 5. Running the project's own tests
 
 ```bash
-python3 -m pytest -q                 # 169 passed in ~40s
+python3 -m pytest -q                 # 180 passed in ~40s
 bash scripts/validate.sh             # schemas, examples, rejected-example corpus, vendored pin
 bash conformance/claudecode/check.sh # byte-for-byte fixture reproduction
 ```

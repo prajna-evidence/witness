@@ -20,7 +20,7 @@ import re
 import subprocess
 from typing import Any, Callable
 
-from witness.gitrepo import owner_name
+from witness.gitrepo import github_repo
 
 Runner = Callable[..., "subprocess.CompletedProcess[str]"]
 
@@ -150,11 +150,6 @@ def _locator(url: str) -> "re.Match[str] | None":
     return match
 
 
-def _bundle_repo(bundle: dict) -> "str | None":
-    """`owner/name` of the repository the bundle is about, from its remote."""
-    remote = (bundle.get("repo") or {}).get("remote")
-    return owner_name(remote) if remote else None
-
 
 def _claimed_existence(bundle: dict, url: str) -> "bool | None":
     """What this bundle originally claimed at `url`, from its own observations.
@@ -175,7 +170,9 @@ def _claimed_existence(bundle: dict, url: str) -> "bool | None":
     return None
 
 
-def online_verify(source: dict, bundle: dict, *, runner: "Runner | None" = None) -> dict[str, Any]:
+def online_verify(
+    source: dict, bundle: dict, subject_repo: "str | None", *, runner: "Runner | None" = None
+) -> dict[str, Any]:
     """The online half of SPEC.md section 6.2 for this channel (decisions.md S19): the
     piece `verify.ONLINE_VERIFIERS` needed wired up before `--online` did anything for a
     real bundle from this adapter, registered lazily by `witness/verify.py`.
@@ -198,16 +195,26 @@ def online_verify(source: dict, bundle: dict, *, runner: "Runner | None" = None)
     if not match:
         return {"outcome": "unreachable", "reason": f"cannot parse retrievable_from: {url!r}"}
 
-    # Anyone can attest a digest in a repository they own. Without this binding a
-    # bundle could point its tier B claim at such a repository and have it confirmed.
+    # Anyone can attest a digest in a repository they own, so the locator is bound to
+    # `subject_repo`: the repository of the checkout being verified, which the verifier
+    # reads from its own clone. Never the bundle's `repo.remote` - the bundle's author
+    # writes that, and would simply name their own repository there too.
     # GitHub owner and repository names are case-insensitive.
-    expected = _bundle_repo(bundle)
-    if expected is None:
-        return {"outcome": "unreachable", "reason": "bundle names no remote to bind the locator to"}
-    if match["repo"].lower() != expected.lower():
+    if subject_repo is None:
+        return {"outcome": "unreachable", "reason": "the checkout has no github.com remote to bind the locator to"}
+    claimed_repo = github_repo((bundle.get("repo") or {}).get("remote"))
+    if claimed_repo is not None and claimed_repo.lower() != subject_repo.lower():
+        # A fork or mirror clone is a legitimate way to get here, so this is not
+        # evidence of a lie - but nothing can be confirmed about a repository the
+        # verifier is not looking at.
+        return {
+            "outcome": "unreachable",
+            "reason": f"bundle is for {claimed_repo!r} but the checkout is {subject_repo!r}",
+        }
+    if match["repo"].lower() != subject_repo.lower():
         return {
             "outcome": "contradicted",
-            "reason": f"locator names repository {match['repo']!r}, but the bundle is for {expected!r}",
+            "reason": f"locator names repository {match['repo']!r}, but the subject is {subject_repo!r}",
         }
 
     claimed = _claimed_existence(bundle, url)

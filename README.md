@@ -41,7 +41,7 @@ After merging: `witness reconcile <bundle> --merge-commit <sha>`. Use `verify --
 ## Status
 
 `0.1.0`, pre-release. Claude Code adapter (hooks + transcript), GitHub Actions build-provenance adapter,
-bundling, reconciliation, verify and viewer all work; 169 tests and a conformance suite.
+bundling, reconciliation, verify and viewer all work; 180 tests and a conformance suite.
 Not in scope: running agents, re-deriving SLSA provenance, dashboards, policy judgement.
 
 Observations are a profile of [`prajna-schemas`](https://github.com/prajna-agent/prajna-schemas)

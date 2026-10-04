@@ -173,8 +173,9 @@ def test_content_reverifies_after_squash_merge_branch_delete_and_gc(repo: pathli
     report = verify.verify_offline(doc, repo)
 
     assert report["locators"]["commit_sha"]["reachable"] is False, "the point of the test: it must actually be dead"
-    assert report["content"]["matched"] == report["content"]["total"] == 1
-    assert all(r["outcome"] == "match" for r in report["content"]["results"])
+    assert report["content"]["recovered"] == report["content"]["total"] == 1
+    assert report["content"]["matched"] == 0, "recovered from history is not the same claim as matched at an anchor"
+    assert all(r["outcome"] == "recovered" for r in report["content"]["results"])
     assert report["ok"], "a dead locator must not fail a bundle whose content still holds"
 
 
@@ -502,7 +503,7 @@ def test_online_a_contradicted_claim_fails_the_bundle(repo: pathlib.Path, monkey
     }
     doc["sources"].append(source)
 
-    def _fake_contradicts(src: dict, bundle_doc: dict) -> dict:
+    def _fake_contradicts(src: dict, bundle_doc: dict, subject_repo: "str | None") -> dict:
         return {"outcome": "contradicted", "detail": "digest mismatch"}
 
     verify.register_online_verifier("github-actions", "attestation", _fake_contradicts)
@@ -527,7 +528,7 @@ def test_a_verifier_that_raises_degrades_rather_than_crashing(repo: pathlib.Path
     }
     doc["sources"].append(source)
 
-    def _boom(src: dict, bundle_doc: dict) -> dict:
+    def _boom(src: dict, bundle_doc: dict, subject_repo: "str | None") -> dict:
         raise RuntimeError("network is down")
 
     verify.register_online_verifier("flaky", "chan", _boom)
@@ -574,6 +575,44 @@ def test_no_recovery_without_a_reachable_base(repo: pathlib.Path) -> None:
 
     report = verify.verify_offline(doc, repo)
     assert report["content"]["results"][0]["outcome"] == "absent"
+
+
+def test_a_forged_base_can_recover_old_content_but_never_as_a_match(repo: pathlib.Path) -> None:
+    """base_commit is the bundle author's claim, so the recovery bound alone is beatable:
+    pointing base at an early commit admits old content again. The defence is that such a
+    hit is reported as `recovered`, never counted as matched at an anchor."""
+    doc = build(repo)
+    doc["commit_sha"] = "f" * 40
+    old = _old_content_hash(repo)
+    doc["anchors"]["base_commit"] = git(repo, "rev-list", "--max-parents=0", "HEAD").strip()
+    doc["files"] = [{"path": "src/refund.py", "sha256": old, "action": "modified"}]
+
+    content = verify.verify_offline(doc, repo)["content"]
+    assert content["results"][0]["outcome"] == "recovered"
+    assert content["matched"] == 0
+
+
+def test_online_binding_comes_from_the_checkout_not_the_bundle(repo: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A forged bundle naming the attacker's repository as both its remote and its tier B
+    locator was confirmed by the first binding fix. The checkout's own remote decides."""
+    from witness.adapters.githubactions import collect
+
+    git(repo, "remote", "add", "origin", "git@github.com:acme/payments-service.git")
+    doc = build(repo)
+    evil = "https://api.github.com/repos/attacker/anything/attestations/sha256:" + "a" * 64
+    source = {"host": "github-actions", "channel": "attestation", "tier": "B",
+              "collected_at": "2026-09-20T12:00:00Z", "retrievable_from": evil,
+              "adapter_version": "githubactions/0.1.0"}
+    doc["repo"]["remote"] = "git@github.com:attacker/anything.git"
+    doc["sources"].append(source)
+    doc["observations"].append({"audit_id": "x", "event": "build.attestation_found", "source": source})
+    fetched: list = []
+    monkeypatch.setattr(collect, "collect_via_api", lambda r, d, **kw: fetched.append(r) or {"exists": True, "error": None})
+    verify.ONLINE_VERIFIERS.pop(("github-actions", "attestation"), None)
+
+    online = verify.verify_online(doc, repo)["online"]
+    assert [o["outcome"] for o in online] == ["unreachable"]
+    assert fetched == []
 
 
 def test_tier_floor_counts_observation_tiers_not_just_the_sources_summary(repo: pathlib.Path) -> None:

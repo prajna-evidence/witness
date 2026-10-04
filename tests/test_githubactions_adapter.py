@@ -225,7 +225,7 @@ def test_online_verify_confirms_existence_that_still_matches() -> None:
     body = json.dumps({"attestations": [{"bundle": {"dsseEnvelope": {"payload": _dsse_payload("x")}}}]})
 
     outcome = githubactions.online_verify(
-        observation["source"], _bundle_with(observation), runner=lambda args: _proc(0, stdout=body)
+        observation["source"], _bundle_with(observation), REPO, runner=lambda args: _proc(0, stdout=body)
     )
     assert outcome == {"outcome": "confirmed"}
 
@@ -235,7 +235,7 @@ def test_online_verify_confirms_a_claimed_absence_that_is_still_absent() -> None
     observation = normalize_attestation(record, "2026-09-23T00:00:00Z")["observation"]
 
     outcome = githubactions.online_verify(
-        observation["source"], _bundle_with(observation), runner=lambda args: _proc(0, stdout='{"attestations": []}')
+        observation["source"], _bundle_with(observation), REPO, runner=lambda args: _proc(0, stdout='{"attestations": []}')
     )
     assert outcome == {"outcome": "confirmed"}
 
@@ -245,7 +245,7 @@ def test_online_verify_reports_contradicted_when_existence_now_disagrees() -> No
     observation = normalize_attestation(record, "2026-09-23T00:00:00Z")["observation"]
 
     outcome = githubactions.online_verify(
-        observation["source"], _bundle_with(observation), runner=lambda args: _proc(0, stdout='{"attestations": []}')
+        observation["source"], _bundle_with(observation), REPO, runner=lambda args: _proc(0, stdout='{"attestations": []}')
     )
     assert outcome["outcome"] == "contradicted"
 
@@ -257,19 +257,19 @@ def test_online_verify_degrades_rather_than_guesses_when_the_refetch_itself_fail
     observation = normalize_attestation(record, "2026-09-23T00:00:00Z")["observation"]
 
     outcome = githubactions.online_verify(
-        observation["source"], _bundle_with(observation), runner=lambda args: _proc(1, stderr="HTTP 500")
+        observation["source"], _bundle_with(observation), REPO, runner=lambda args: _proc(1, stderr="HTTP 500")
     )
     assert outcome == {"outcome": "unreachable", "reason": "HTTP 500"}
 
 
 def test_online_verify_is_unreachable_with_no_matching_observation_in_the_bundle() -> None:
     source = {"retrievable_from": f"https://api.github.com/repos/{REPO}/attestations/{DIGEST}"}
-    outcome = githubactions.online_verify(source, {"observations": []})
+    outcome = githubactions.online_verify(source, {"observations": []}, REPO)
     assert outcome["outcome"] == "unreachable"
 
 
 def test_online_verify_is_unreachable_for_a_locator_it_does_not_recognise() -> None:
-    outcome = githubactions.online_verify({"retrievable_from": "https://example.com/nope"}, {"observations": []})
+    outcome = githubactions.online_verify({"retrievable_from": "https://example.com/nope"}, {"observations": []}, REPO)
     assert outcome["outcome"] == "unreachable"
 
 
@@ -327,7 +327,9 @@ def test_verify_online_reaches_the_real_github_actions_verifier_end_to_end(
     assert report["ok"]
 
 
-# ---- binding a tier B locator to the bundle's own repository -------------------------
+# ---- binding a tier B locator to the repository being verified ------------------------
+# The subject repository comes from the verifier's own checkout, never from the bundle:
+# the bundle's author writes `repo.remote` and would name their own repository there too.
 
 
 def _found_observation(repo: str = REPO) -> dict:
@@ -338,40 +340,69 @@ def _found_observation(repo: str = REPO) -> dict:
 _FOUND = json.dumps({"attestations": [{"bundle": {"dsseEnvelope": {"payload": _dsse_payload("x")}}}]})
 
 
+def _no_fetch(calls: list):
+    return lambda args: calls.append(args) or _proc(0, stdout=_FOUND)
+
+
 def test_online_verify_contradicts_a_locator_for_another_repository() -> None:
-    """Anyone can attest a digest in a repository they own. Before the binding, a bundle
-    pointing its claim at such a repository came back `confirmed`."""
+    """Anyone can attest a digest in a repository they own; such a claim must not be confirmed."""
     observation = _found_observation("attacker/anything")
     calls: list = []
-
-    outcome = githubactions.online_verify(
-        observation["source"], _bundle_with(observation),
-        runner=lambda args: calls.append(args) or _proc(0, stdout=_FOUND),
-    )
+    outcome = githubactions.online_verify(observation["source"], _bundle_with(observation), REPO, runner=_no_fetch(calls))
     assert outcome["outcome"] == "contradicted"
     assert "attacker/anything" in outcome["reason"]
     assert calls == [], "a mismatched repository must be rejected before any re-fetch"
 
 
+def test_online_verify_ignores_a_bundle_that_rebinds_itself_to_the_attackers_repository() -> None:
+    """The bypass in the first binding: it trusted the bundle's own `repo.remote`, so a
+    forger named their repository in both places and the claim came back confirmed."""
+    observation = _found_observation("attacker/anything")
+    forged = _bundle_with(observation, remote="git@github.com:attacker/anything.git")
+    calls: list = []
+    outcome = githubactions.online_verify(observation["source"], forged, REPO, runner=_no_fetch(calls))
+    assert outcome["outcome"] != "confirmed"
+    assert calls == []
+
+
 def test_online_verify_matches_repository_names_case_insensitively() -> None:
     observation = _found_observation()
     outcome = githubactions.online_verify(
-        observation["source"], _bundle_with(observation, remote=f"https://github.com/{REPO.upper()}.git"),
-        runner=lambda args: _proc(0, stdout=_FOUND),
+        observation["source"], _bundle_with(observation), REPO.upper(), runner=lambda args: _proc(0, stdout=_FOUND)
     )
     assert outcome == {"outcome": "confirmed"}
 
 
-def test_online_verify_cannot_bind_a_bundle_with_no_remote() -> None:
+def test_online_verify_cannot_bind_without_a_github_checkout() -> None:
     observation = _found_observation()
-    bundle_doc = {"repo": {"remote": None}, "observations": [observation]}
-    outcome = githubactions.online_verify(observation["source"], bundle_doc, runner=lambda args: _proc(0, stdout=_FOUND))
+    outcome = githubactions.online_verify(
+        observation["source"], _bundle_with(observation), None, runner=lambda args: _proc(0, stdout=_FOUND)
+    )
     assert outcome["outcome"] == "unreachable"
 
 
 @pytest.mark.parametrize("repo_part", [f"{REPO}/..", "../octo", f"{REPO}/extra", f"{REPO}?x=1"])
 def test_online_verify_rejects_locators_that_do_not_name_exactly_one_repository(repo_part: str) -> None:
     source = {"retrievable_from": f"https://api.github.com/repos/{repo_part}/attestations/{DIGEST}"}
-    outcome = githubactions.online_verify(source, {"repo": {"remote": f"git@github.com:{REPO}.git"}, "observations": []})
+    outcome = githubactions.online_verify(source, {"observations": []}, REPO)
     assert outcome["outcome"] == "unreachable"
     assert "cannot parse" in outcome["reason"]
+
+
+@pytest.mark.parametrize(
+    "url, expected",
+    [
+        (f"git@github.com:{REPO}.git", REPO),
+        (f"https://github.com/{REPO}.git", REPO),
+        (f"https://github.com/{REPO}", REPO),
+        (f"ssh://git@github.com/{REPO}.git", REPO),
+        (f"https://gitlab.com/{REPO}.git", None),
+        (f"https://github.com.evil.example/{REPO}.git", None),
+        ("https://github.com/octo/..", None),
+        (None, None),
+    ],
+)
+def test_github_repo_only_binds_github_remotes(url, expected) -> None:
+    from witness import gitrepo
+
+    assert gitrepo.github_repo(url) == expected

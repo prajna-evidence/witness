@@ -28,6 +28,7 @@ expected to keep them separate too.
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 from pathlib import Path
 
@@ -247,6 +248,24 @@ def slug(root: Path) -> str:
     if not url:
         return root.resolve().name
     return owner_name(url)
+
+
+_GITHUB_REMOTE_RE = re.compile(
+    r"^(?:https://github\.com/|ssh://git@github\.com/|git@github\.com:)"
+    r"(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?$"
+)
+
+
+def github_repo(url: "str | None") -> "str | None":
+    """`owner/name` when `url` is a github.com remote, else None.
+
+    Stricter than `owner_name`: binding a GitHub API locator to a remote on another host
+    would compare two unrelated namespaces that merely share a spelling.
+    """
+    match = _GITHUB_REMOTE_RE.match(url or "")
+    if not match or any(part in (".", "..") for part in match["repo"].split("/")):
+        return None
+    return match["repo"]
 
 
 def owner_name(url: str) -> str:

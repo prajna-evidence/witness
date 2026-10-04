@@ -123,9 +123,14 @@ def _print_verify_report(report: dict) -> None:
         print(f"  locator {key:13s} {'reachable' if loc['reachable'] else 'DEAD (expected after a squash/rebase + delete)'}  {loc['sha']}")
 
     content = report["content"]
-    print(f"  content       {content['matched']}/{content['total']} file claims re-verified")
+    print(f"  content       {content['matched']}/{content['total']} file claims re-verified at an anchor")
+    if content.get("recovered"):
+        print(
+            f"                  {content['recovered']} recovered from history: the content existed after the"
+            " claimed base, but no live anchor ties it to this change (run `witness reconcile`)"
+        )
     for row in content["results"]:
-        if row["outcome"] != "match":
+        if row["outcome"] not in ("match", "recovered"):
             print(f"                  {row['outcome'].upper():8s} {row['path']} (checked at {row['checked_at']})")
 
     floor = report["tier_floor"]
