@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adapter-manifest.schema.json",
+  "title": "AdapterManifest",
+  "description": "What one adapter can and cannot tell you, declared before it runs.\n\nThis is not documentation. It is the honest answer to 'what will this actually tell me about my Copilot fleet' - a question that should be answerable before installation rather than discovered in month three - and it is what the conformance kit tests an adapter against. An adapter whose manifest claims a field it never fills is a failing adapter, not a sloppy one.\n\nThe fields most likely to drift are `permanently_null` and `max_tier`. They are declared here so that drift is a test failure rather than a quiet degradation of everything downstream.",
+  "type": "object",
+  "required": ["adapter", "version", "host", "channels", "permanently_null"],
+  "additionalProperties": false,
+  "properties": {
+    "adapter": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Adapter slug, e.g. `claudecode`, `ghactions`, `agenthq`." },
+    "version": { "type": "string", "minLength": 1, "description": "Adapter version. Appears verbatim in every observation's `source.adapter_version`." },
+    "host": { "type": "string", "minLength": 1, "description": "The system observed. Matches `source.host` on everything this adapter emits." },
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Each surface this adapter reads, with the best tier obtainable from it. Separate entries because one host's surfaces differ in evidential worth: a GitHub attestation and a GitHub REST read are not the same kind of claim.",
+      "items": {
+        "type": "object",
+        "required": ["channel", "max_tier"],
+        "additionalProperties": false,
+        "properties": {
+          "channel": { "type": "string", "minLength": 1, "description": "Surface name. Matches `source.channel`." },
+          "max_tier": { "$ref": "common.schema.json#/$defs/tier", "description": "The BEST tier this surface can yield. An adapter MUST NOT emit an observation above it, and MUST NOT reach it by inference from a lower-tier source (decision S3)." },
+          "requires_entitlement": { "type": ["string", "null"], "description": "The entitlement a deployment needs before this surface exists at all, e.g. `github-enterprise-managed-users`. Null when the surface is open to anyone. Present because 'you cannot use the best half of this product' should be legible before purchase." },
+          "stability": { "type": "string", "enum": ["stable", "preview", "deprecated"], "default": "stable", "description": "`preview` means the host may change the shape without notice; conformance fixtures pin what we saw." },
+          "retention_days": { "type": ["integer", "null"], "minimum": 0, "description": "How long the host keeps the data, when it says. Null when unlimited or undocumented.\n\nDIRECTLY LOAD-BEARING: a tier B claim is only re-fetchable while the host still holds it, so this number is the shelf life of the strongest evidence in the bundle. GitHub's agentic audit-log filter is 180 days." }
+        }
+      }
+    },
+    "permanently_null": {
+      "type": "object",
+      "description": "Fields this adapter can NEVER fill, mapped to the reason. Keys are JSON Pointers into the evidence bundle.\n\nDeclaring these is the whole point of the manifest. An adapter that reads an enterprise audit log knows who ran what against which repo and knows nothing about model, tokens or cost - and saying so up front is the difference between a limit and a disappointment.",
+      "additionalProperties": { "$ref": "common.schema.json#/$defs/reasonCode" },
+      "propertyNames": { "pattern": "^/" }
+    },
+    "notes": { "type": "string", "description": "Free text for anything a reader needs that the fields above cannot carry." }
+  },
+  "examples": [
+    {
+      "adapter": "agenthq",
+      "version": "0.1.0",
+      "host": "github-agent-hq",
+      "channels": [
+        {
+          "channel": "enterprise-audit-log",
+          "max_tier": "B",
+          "requires_entitlement": "github-enterprise-managed-users",
+          "stability": "preview",
+          "retention_days": 180
+        }
+      ],
+      "permanently_null": {
+        "/model_turns": "host_does_not_emit",
+        "/cost": "host_does_not_emit",
+        "/redaction": "not_applicable",
+        "/memory": "not_applicable",
+        "/pramana": "not_applicable"
+      },
+      "notes": "Records that an agent session occurred, against which repo, under whose approval. Pair with the claude-code adapter, which is the mirror image: everything this one cannot see, and nothing this one can."
+    }
+  ]
+}

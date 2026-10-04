@@ -1,0 +1,21 @@
+{
+  "adapter": "githubactions",
+  "version": "0.1.0",
+  "host": "github-actions",
+  "channels": [
+    {
+      "channel": "attestation",
+      "max_tier": "B",
+      "requires_entitlement": null,
+      "stability": "stable",
+      "retention_days": null
+    }
+  ],
+  "permanently_null": {
+    "/observations/0/tokens": "not_applicable",
+    "/observations/0/cost_usd": "not_applicable",
+    "/observations/0/injected_units": "not_applicable",
+    "/model_turns": "not_applicable"
+  },
+  "notes": "Consumes GitHub's native build-provenance attestations (actions/attest-build-provenance), an in-toto statement on the SLSA track. Per decision S6, this adapter does not re-derive build provenance or re-implement Sigstore signature verification - it references the attestation by subject digest and records the outcome of a verification GitHub (via `gh attestation verify`) or the GitHub REST attestations API already performed. Two collection paths, recorded distinctly because they support different strength claims: `collect_via_api` confirms an attestation EXISTS for the digest and is retrievable - tier B on its own, since a verifier can re-fetch it - without asserting its Sigstore signature was checked by us; `collect_via_verify` additionally runs `gh attestation verify` against a local artifact or OCI reference and records its exit code as the authoritative verified/failed signal, because gh's own trust-chain check is exactly the thing S6 says not to reinvent. No model-turn concept on this host, so `model_turns` and the observation's token/cost fields are `not_applicable` rather than `host_does_not_emit` - the field is meaningful for an agent host and meaningless for a build-provenance one, which is precisely what `not_applicable` means (SPEC.md section 3.3)."
+}

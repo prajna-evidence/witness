@@ -1,0 +1,30 @@
+{
+  "adapter": "claudecode",
+  "version": "0.2.0",
+  "host": "claude-code",
+  "channels": [
+    {
+      "channel": "hook",
+      "max_tier": "C",
+      "requires_entitlement": null,
+      "stability": "stable",
+      "retention_days": null
+    },
+    {
+      "channel": "transcript",
+      "max_tier": "C",
+      "requires_entitlement": null,
+      "stability": "stable",
+      "retention_days": null
+    }
+  ],
+  "permanently_null": {
+    "/observations/0/timestamp": "host_does_not_emit",
+    "/model_turns/0/cost_usd": "host_does_not_emit",
+    "/model_turns/0/injected_units": "not_applicable",
+    "/redaction": "not_applicable",
+    "/memory": "not_applicable",
+    "/pramana": "not_applicable"
+  },
+  "notes": "Two channels with different reach, declared separately because conflating them would overstate the hook. HOOK payloads carry no timestamp, no model id and no token accounting - `captured_at` is our own clock and may lag the event. Model id and token accounting (W2b, 0.2.0) come from the TRANSCRIPT channel instead: one JSONL line per model turn, read from Claude Code's own session log, keyed by session id and never by the hook. Both channels are tier C: each is the agent reporting on itself, and no amount of local corroboration changes that (S3) - the transcript is a second self-report, not a third party. `cost_usd` stays permanently null on every turn: Witness has no price table yet. This is a Witness limitation, not a host one, and it is out of scope for W2b (implementation-plan.md), whose acceptance criterion is model id and token counts only. The bundle-level `cost` object is separately null with `host_does_not_emit` in `unavailable`, which remains accurate until an estimator exists. `permission_mode` is the one governance signal the hook does carry, and it is mapped to gates: a session run under bypassPermissions is a materially different story from one run under default, and an artifact that cannot tell them apart is not worth committing."
+}

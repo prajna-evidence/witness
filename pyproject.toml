@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "witness"
+version = "0.1.0"
+description = "Evidence layer for AI-authored code changes"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = ["jsonschema>=4.20"]
+
+[project.urls]
+Repository = "https://github.com/prajna-evidence/witness"
+Specification = "https://github.com/prajna-evidence/witness/blob/main/SPEC.md"
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+witness = "witness.cli:main"
+
+[tool.setuptools]
+packages = [
+    "witness",
+    "witness.adapters",
+    "witness.adapters.claudecode",
+    "witness.adapters.githubactions",
+    "witness_schemas",
+    "witness_schemas.vendor",
+]
+
+[tool.setuptools.package-dir]
+witness_schemas = "schemas"
+
+[tool.setuptools.package-data]
+"witness.adapters.claudecode" = ["manifest.json"]
+witness_schemas = ["*.json", "*.md"]
+"witness_schemas.vendor" = ["*.json", "*.md", "PINNED_AT"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

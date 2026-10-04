@@ -1,0 +1,44 @@
+{
+  "gaps": [],
+  "gates": [],
+  "gates_unavailable": {
+    "/gates": "host_does_not_emit"
+  },
+  "malformed_lines": 1,
+  "observations": [
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "0ba25781-276f-546b-a9a8-840cb07fcaea",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "session.started",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/phase": "not_applicable",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": null,
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T12:00:00Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T12:00:00Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    }
+  ]
+}

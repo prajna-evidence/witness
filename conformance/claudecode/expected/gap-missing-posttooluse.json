@@ -1,0 +1,152 @@
+{
+  "gaps": [
+    "toolu_01CCC"
+  ],
+  "gates": [],
+  "gates_unavailable": {
+    "/gates": "host_does_not_emit"
+  },
+  "malformed_lines": 0,
+  "observations": [
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "0ba25781-276f-546b-a9a8-840cb07fcaea",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "session.started",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/phase": "not_applicable",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": null,
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T10:00:00Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T10:00:00Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    },
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "8c4562de-85cb-50b9-b32a-30df6364a621",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "tool.requested",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_01CCC",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/phase": "host_does_not_emit",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": null,
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T10:01:03Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T10:01:03Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    },
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "c1278082-f6f4-5ea6-94ac-99f68e27d832",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "turn.completed",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/phase": "not_applicable",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": null,
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T10:01:09Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T10:01:09Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    },
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "087570bc-e866-5c56-b9cb-8d7a929e92dc",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "tool.outcome_unknown",
+      "injected_units": null,
+      "payload": {
+        "error": "PreToolUse captured with no matching PostToolUse; the outcome of this tool call is unknown to us",
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_01CCC",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/payload/tool_response": "collection_failed",
+          "/phase": "host_does_not_emit",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": null,
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T10:01:03Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T10:01:03Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "$schema_under_test": "evidence-bundle.schema.json",
+  "schema_version": 2,
+  "id": "01K5Q8XJ3M7YB0V2ND4RTGWZ6A",
+  "generated_at": "2026-09-10T09:41:17Z",
+  "generated_by": "witness/0.1.0",
+  "tier_floor": "C",
+  "commit_sha": "4f1c2ab9d0e37c5a8b1146f2ee9037c4a5d6b8e1",
+  "anchors": {
+    "base_commit": "9d41b7c0e8a25f3b16d4c08e7a95f2b30c4d81e6",
+    "base_tree": "2f7a1e05c93d84b6072ea1f3c85d90b4e6172a8d",
+    "patch_id": "a41c9e77b2d0356f8e14a9c0d73b25e8f019c4a6",
+    "merge_commit": null
+  },
+  "repo": {
+    "slug": "payments-service",
+    "branch": "fix/refund-rounding",
+    "remote": "git@github.com:acme/payments-service.git",
+    "pr_url": "https://github.com/acme/payments-service/pull/812"
+  },
+  "sources": [
+    {
+      "host": "claude-code",
+      "channel": "hook",
+      "tier": "C",
+      "collected_at": "2026-09-10T09:41:15Z",
+      "retrievable_from": null,
+      "adapter_version": "claudecode/0.1.0"
+    },
+    {
+      "host": "github-actions",
+      "channel": "attestation",
+      "tier": "B",
+      "collected_at": "2026-09-10T09:41:16Z",
+      "retrievable_from": null,
+      "adapter_version": "ghactions/0.1.0"
+    }
+  ],
+  "observations": [
+    {
+      "audit_id": "0d1f8a3e-1c4b-4a77-9f2e-6b5c0a9d4e11",
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "timestamp": "2026-09-10T09:14:02Z",
+      "event": "tool.write",
+      "actor": "agent:claude-code",
+      "trace_id": "witness-0001",
+      "phase": "code",
+      "payload": {
+        "path": "src/payments/refund.py"
+      },
+      "source": {
+        "host": "claude-code",
+        "channel": "hook",
+        "tier": "C",
+        "collected_at": "2026-09-10T09:14:02Z",
+        "retrievable_from": null,
+        "adapter_version": "claudecode/0.1.0"
+      }
+    },
+    {
+      "audit_id": "b2c74f90-8e15-4d63-a70b-33f9c1d5e802",
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "timestamp": "2026-09-10T09:38:44Z",
+      "event": "build.attested",
+      "actor": "github-actions",
+      "trace_id": "witness-0001",
+      "phase": "build",
+      "tokens": null,
+      "cost_usd": null,
+      "payload": {
+        "workflow": "ci.yml",
+        "predicate_type": "https://slsa.dev/provenance/v1",
+        "unavailable": {
+          "/tokens": "not_applicable",
+          "/cost_usd": "not_applicable"
+        }
+      },
+      "source": {
+        "host": "github-actions",
+        "channel": "attestation",
+        "tier": "B",
+        "collected_at": "2026-09-10T09:38:50Z",
+        "retrievable_from": "https://api.github.com/repos/acme/payments-service/attestations/sha256:9c1d",
+        "adapter_version": "ghactions/0.1.0"
+      }
+    }
+  ],
+  "model_turns": [
+    {
+      "seq": 0,
+      "at": "2026-09-10T09:13:51Z",
+      "phase": "code",
+      "host": "claude-code",
+      "transport": "claude-cli",
+      "model_id": "claude-opus-5",
+      "effort": null,
+      "tokens": {
+        "input": 18422,
+        "output": 1136,
+        "cache_read": 15200,
+        "cache_write": 0
+      },
+      "cost_usd": 0.21,
+      "injected_units": null
+    }
+  ],
+  "files": [
+    {
+      "path": "src/payments/refund.py",
+      "sha256": "6b1f0c9d2a44e7385c0fb17d9e2a3c6851ddb0f4a7c93e2185f6d0a4b3c81e59",
+      "action": "modified"
+    },
+    {
+      "path": "tests/test_refund.py",
+      "sha256": "c3a70e15bd8249f6a01c7e3d5b92f4086ad1e7c204b8935f6e0d1a72c4b8f930",
+      "action": "created"
+    }
+  ],
+  "gates": [
+    {
+      "gate": "pr-review",
+      "decision": "approved",
+      "actor": "user:priya",
+      "at": "2026-09-10T09:40:02Z",
+      "reason": null,
+      "tier": "B"
+    }
+  ],
+  "cost": {
+    "total_usd": 0.21,
+    "disclaimer": "Local estimate from a price table. The provider's invoice is authoritative."
+  },
+  "redaction": null,
+  "memory": null,
+  "pramana": null,
+  "unavailable": {
+    "/redaction": "not_applicable",
+    "/memory": "not_applicable",
+    "/pramana": "not_applicable",
+    "/model_turns/0/injected_units": "not_applicable"
+  },
+  "$must_fail_because": "a tier B source with retrievable_from null is a tier C claim wearing a badge (SPEC 4.2, common.schema.json source.allOf)"
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.prajnaagent.com/journal-event.schema.json",
+  "title": "JournalEvent",
+  "description": "One row of the Pramana append-only journal, widened for AI-DLC phase 1. This is `audit-event.schema.json` plus the four fields the provenance artifact needs to assemble itself: `tokens`, `cost_usd`, `injected_units`, and `phase`. It is a separate schema rather than an edit to `audit-event` because that shape is a released cross-product contract and the additive-only rule applies to it too.\n\nAPPEND-ONLY IS ENFORCED IN THE DATABASE, not by convention: `pramana_events` carries SQLite triggers that reject UPDATE and DELETE. A trigger cannot be bypassed by a force-push, which is why a git-backed journal was rejected in favour of it.\n\nHASH CHAIN. `prev_hash`/`entry_hash` make an offline edit of the SQLite file detectable. They are not self-sufficient — anyone who can edit the file can recompute the chain forward and restore self-consistency — so the chain head is anchored in the provenance artifact, which is committed to the user's git and pushed to their remote. See provenance.schema.json `pramana.chain_head`.",
+  "type": "object",
+  "required": ["audit_id", "session_id", "timestamp", "event", "actor", "trace_id"],
+  "additionalProperties": true,
+  "properties": {
+    "audit_id": { "type": "string", "format": "uuid", "description": "Unique identifier for this entry." },
+    "session_id": { "type": "string", "format": "uuid", "description": "Scopes the entry to a single user/agent session." },
+    "timestamp": { "type": "string", "format": "date-time", "description": "ISO 8601 UTC timestamp." },
+    "event": { "type": "string", "minLength": 1, "description": "Event name. Open-ended; products define their own vocabulary." },
+    "actor": { "type": "string", "minLength": 1, "description": "Who/what produced the event (`user:jags`, `agent:code-runner`, `sutra`)." },
+    "trace_id": { "type": "string", "minLength": 1, "description": "Correlates the entry with its task. Required on every event without exception." },
+    "task_id": { "type": ["string", "null"], "format": "uuid", "description": "Prajna task UUID, null when not task-scoped." },
+    "repo_id": { "type": ["string", "null"], "format": "uuid", "description": "Repo UUID, null when not repo-scoped." },
+    "payload": { "type": "object", "additionalProperties": true, "description": "Event-specific data." },
+    "phase": {
+      "type": ["string", "null"],
+      "description": "Which SDLC phase produced the event. Free-form so a user-defined agent is not forced into the five kinds; conventionally one of `intent`, `plan`, `code`, `build`, `review`, `deploy`, `monitor`. Null for platform events belonging to no phase."
+    },
+    "tokens": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "Token accounting for a model turn. Null on every event that is not a model turn.",
+      "properties": {
+        "input": { "type": "integer", "minimum": 0, "description": "Input tokens billed." },
+        "output": { "type": "integer", "minimum": 0, "description": "Output tokens billed." },
+        "cache_read": { "type": "integer", "minimum": 0, "description": "Tokens served from prompt cache." },
+        "cache_write": { "type": "integer", "minimum": 0, "description": "Tokens written to prompt cache." }
+      },
+      "required": ["input", "output"]
+    },
+    "cost_usd": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Estimated USD for this event. An ESTIMATE from a local price table, never a billed amount — the provider's invoice is authoritative and the artifact says so."
+    },
+    "injected_units": {
+      "type": ["array", "null"],
+      "items": { "$ref": "https://schemas.prajnaagent.com/memory-unit.schema.json#/$defs/prajnaUri" },
+      "uniqueItems": true,
+      "description": "The exact set of Smriti unit addresses injected into this turn's prompt, in injection order. This is what makes the run reconstructable: given a task id, recover exactly what the model was told."
+    },
+    "prev_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "`entry_hash` of the preceding row. Null on the first row of the chain only."
+    },
+    "entry_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256(audit_id || prev_hash || canonical_json(row)), where canonical_json excludes `prev_hash` and `entry_hash` themselves and serialises with sorted keys and no insignificant whitespace."
+    }
+  }
+}

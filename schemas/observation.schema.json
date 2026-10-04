@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "observation.schema.json",
+  "title": "Observation",
+  "description": "One normalised record of one thing an agent did, from any host.\n\nAn observation is a PROFILE of journal-event.schema.json, not a replacement for it. The upstream schema already carries `phase`, `tokens`, `cost_usd`, `injected_units`, the hash chain, and additionalProperties:true for host-native passthrough; decision S5 forbids forking it. This document adds exactly one required thing - the `source` block - and constrains the corners of `payload` that Witness assigns meaning to.\n\nThe upstream copy is vendored under schemas/vendor/ and pinned. It is never edited here.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "vendor/journal-event.schema.json",
+      "$comment": "Everything upstream requires - audit_id, session_id, timestamp, event, actor, trace_id - is required here too. An observation that does not satisfy the journal-event contract is not an observation."
+    },
+    {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": { "$ref": "common.schema.json#/$defs/source" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Upstream leaves this open. The three properties below are the only ones Witness assigns meaning to; an adapter may add host-native keys alongside them and they will be carried through unchanged.",
+          "properties": {
+            "unavailable": { "$ref": "common.schema.json#/$defs/unavailable" },
+            "corroborated_by": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Other sources that independently reported a consistent value, as `host:channel` pairs.\n\nRECORDING CORROBORATION NEVER CHANGES `source.tier` (decision S3, SPEC.md section 4.4). Finding a matching value in a host audit log does not make a locally-captured value host-attested; only a tier B source that carries the value itself can do that. This rule will feel wrong the first time it makes a demo look weaker than it 'really' is - that pressure is precisely why it is written down."
+            },
+            "error": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Required whenever any entry in `unavailable` is `collection_failed`. The distinction between 'the host has no such field' and 'we failed to read it' is the difference between a limit and a bug, and an auditor is entitled to know which they are looking at."
+            }
+          }
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "audit_id": "0d1f8a3e-1c4b-4a77-9f2e-6b5c0a9d4e11",
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "timestamp": "2026-09-10T09:14:02Z",
+      "event": "tool.write",
+      "actor": "agent:claude-code",
+      "trace_id": "witness-0001",
+      "phase": "code",
+      "tokens": null,
+      "cost_usd": null,
+      "payload": {
+        "path": "src/payments/refund.py",
+        "unavailable": {
+          "/tokens": "host_does_not_emit",
+          "/cost_usd": "host_does_not_emit"
+        }
+      },
+      "source": {
+        "host": "claude-code",
+        "channel": "hook",
+        "tier": "C",
+        "collected_at": "2026-09-10T09:14:02Z",
+        "retrievable_from": null,
+        "adapter_version": "claudecode/0.1.0"
+      }
+    }
+  ]
+}

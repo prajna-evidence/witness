@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "title": "WitnessCommon",
+  "description": "Shared definitions: evidence tiers, reason codes, and the source attribution block. Nothing here is a standalone document; it exists so tier and reason-code semantics have exactly one definition. SPEC.md sections 3 and 4 are normative for the meaning of these values; this file only constrains their shape.\n\nFROZEN FOR MAJOR VERSION 1. Neither the tier enum nor the reason-code enum may lose or redefine a member. A tier whose meaning drifts retroactively falsifies every bundle already committed to a customer's git history, which is a failure mode with no recovery path.",
+  "$defs": {
+    "tier": {
+      "type": "string",
+      "enum": ["A", "B", "C"],
+      "description": "Evidence tier. Answers exactly one question: if the party being audited is lying, what catches them?\n\nA - attested. Produced by a runner under our control, journalled append-only, chain head anchored in git and pushed. Catches post-hoc edits of the journal.\nB - host-attested. Independently retrievable from a third party the subject does not control. Catches local fabrication, but is perishable: once the host's retention window closes the claim can no longer be re-fetched.\nC - self-reported. The agent said so about itself. Catches nothing on its own; git-anchoring makes it non-repudiable, which is a weaker and different property from verified.\n\nNot a quality score and not a confidence level. See SPEC.md section 4."
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "host_does_not_emit",
+        "host_gated",
+        "not_yet_available",
+        "permission_denied",
+        "collection_failed",
+        "out_of_retention",
+        "not_applicable"
+      ],
+      "description": "Why a field could not be filled. CLOSED LIST - an adapter may not invent a code; propose additions by PR.\n\nhost_does_not_emit - the host has no such concept, or exposes it on no surface.\nhost_gated - the surface exists but needs an entitlement this deployment lacks (e.g. GitHub Enterprise Managed Users).\nnot_yet_available - the surface is in preview and unstable.\npermission_denied - credentials present but insufficient.\ncollection_failed - the surface was reachable but the read errored. MUST carry payload.error.\nout_of_retention - the event predates the host's retention window.\nnot_applicable - the field is meaningless for this event kind.\n\nThe existence of this list is the point. An adapter that cannot fill a field emits null plus a code from here; it never omits the field and never substitutes zero, because a zero is indistinguishable from a genuine zero and turns a limit of the evidence into a false claim about it."
+    },
+    "unavailable": {
+      "type": "object",
+      "description": "Map of field path (JSON Pointer, relative to the containing document) to the reason that field is null. Every null field that a reader might otherwise expect to be populated MUST appear here. scripts/validate.sh and `witness verify` both check this coverage - a null with no reason is a defect, not an omission.",
+      "additionalProperties": { "$ref": "#/$defs/reasonCode" },
+      "propertyNames": { "pattern": "^/" }
+    },
+    "source": {
+      "type": "object",
+      "description": "How this record was obtained. Mandatory on every observation: without it the tier is not computable and the bundle is invalid.",
+      "required": ["host", "channel", "tier", "collected_at", "adapter_version"],
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The system observed. Conventionally one of `github-agent-hq`, `github-actions`, `claude-code`, `codex`, `cursor`, `aidlc`, `witness-native`. Open-ended on purpose: a new agent host should be addable by writing an adapter, not by amending this schema."
+        },
+        "channel": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The specific surface the record came from: `enterprise-audit-log`, `rest-api`, `hook`, `otel`, `transcript`, `attestation`, `workflow-run`. Recorded separately from `host` because one host offers surfaces of different evidential worth - a GitHub attestation and a GitHub REST read are not the same kind of claim."
+        },
+        "tier": { "$ref": "#/$defs/tier" },
+        "collected_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When Witness obtained the record. Deliberately distinct from the event's own `timestamp`: the gap between them is how far behind the collector was running, which matters when a host's retention window is in play."
+        },
+        "retrievable_from": {
+          "type": ["string", "null"],
+          "description": "Tier B only: a stable locator a verifier can re-fetch this claim from. MUST be null at tiers A and C, because at those tiers there is no third party to ask. This field is what makes `verify --online` possible."
+        },
+        "adapter_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact adapter build that produced the record, e.g. `claudecode/0.2.1`. Names what to re-run to reproduce."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "tier": { "const": "B" } }, "required": ["tier"] },
+          "then": {
+            "properties": { "retrievable_from": { "type": "string", "minLength": 1 } },
+            "required": ["retrievable_from"],
+            "$comment": "A tier B claim that cannot be re-fetched is not host-attested; it is a tier C claim wearing a badge."
+          },
+          "else": { "properties": { "retrievable_from": { "type": "null" } } }
+        }
+      ]
+    }
+  }
+}

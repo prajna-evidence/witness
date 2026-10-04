@@ -1,0 +1,255 @@
+{
+  "gaps": [],
+  "gates": [],
+  "gates_unavailable": {
+    "/gates": "host_does_not_emit"
+  },
+  "malformed_lines": 0,
+  "observations": [
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "0ba25781-276f-546b-a9a8-840cb07fcaea",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "session.started",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/phase": "not_applicable",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": null,
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T09:10:00Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T09:10:00Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    },
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "df68fc20-dab7-56f9-82b4-cd39148977ce",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "intent.submitted",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": "intent",
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T09:10:12Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T09:10:12Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    },
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "4cf7756c-ce75-5ac0-9b46-5f4ccf7e3fb5",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "tool.requested",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "target": "src/payments/refund.py",
+        "tool_name": "Edit",
+        "tool_use_id": "toolu_01AAA",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": "code",
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T09:13:55Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T09:13:55Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    },
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "a65ec7bd-fe58-5c21-a8e1-2c3af896e4e4",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "tool.completed",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "target": "src/payments/refund.py",
+        "tool_name": "Edit",
+        "tool_use_id": "toolu_01AAA",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": "code",
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T09:13:56Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T09:13:56Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    },
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "1ea56eeb-09f2-5bc3-bd3f-6b920b0b659b",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "tool.requested",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_01BBB",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/phase": "host_does_not_emit",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": null,
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T09:14:20Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T09:14:20Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    },
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "0756276b-7918-5342-850d-de83839be3b0",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "tool.completed",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_01BBB",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/phase": "host_does_not_emit",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": null,
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T09:14:41Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T09:14:41Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    },
+    {
+      "actor": "agent:claude-code",
+      "audit_id": "7596aabd-1e9f-57cf-9b6f-84408c31b5e5",
+      "cost_usd": null,
+      "entry_hash": null,
+      "event": "turn.completed",
+      "injected_units": null,
+      "payload": {
+        "effort": "medium",
+        "permission_mode": "default",
+        "unavailable": {
+          "/cost_usd": "host_does_not_emit",
+          "/injected_units": "not_applicable",
+          "/phase": "not_applicable",
+          "/tokens": "host_does_not_emit"
+        }
+      },
+      "phase": null,
+      "prev_hash": null,
+      "repo_id": null,
+      "session_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52",
+      "source": {
+        "adapter_version": "claudecode/0.2.0",
+        "channel": "hook",
+        "collected_at": "2026-09-10T09:14:44Z",
+        "host": "claude-code",
+        "retrievable_from": null,
+        "tier": "C"
+      },
+      "task_id": null,
+      "timestamp": "2026-09-10T09:14:44Z",
+      "tokens": null,
+      "trace_id": "7c9a2b10-5d3e-4f81-b6a2-1e0c8d7f3a52"
+    }
+  ]
+}

@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.prajnaagent.com/memory-unit.schema.json",
+  "title": "MemoryUnit",
+  "description": "Frontmatter of a single Smriti memory unit. A unit is one file: a YAML frontmatter block delimited by `---` lines, followed by a free-prose markdown body. This schema validates the frontmatter only; the body is never validated. Git is the source of truth and any index is derived and disposable.\n\nADDRESSING GRAMMAR. A unit is addressed as `prajna://<scope-name>/<type>/<slug>`, where `<scope-name>` is one of `session:<ulid>`, `task:<ulid>`, `repo:<slug>`, or the `name` of an entry declared in `scope-chain.schema.json`. `<type>` is this schema's `type` value and `<slug>` is its `slug`. An address never contains the ULID: it names the logical CLAIM, not the file. A supersedes chain keeps one slug, so every unit in the chain shares one address and the address always resolves to whichever unit in it is currently `active`. This is what lets a citation written a year ago keep pointing at the current answer. \n\nADDITIVE-ONLY COMPATIBILITY RULE. Every field added to this schema after its first release MUST be optional, and no existing field may be removed, renamed, narrowed, or have enum values deleted. A corpus written yesterday must load unchanged in tomorrow's binary. Consumers MUST ignore unknown properties rather than reject them, which is why `additionalProperties` is true here and false on the nested objects, whose shapes are closed.",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "scope",
+    "slug",
+    "title",
+    "status",
+    "created"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+      "description": "ULID, Crockford base32, 26 characters. Lexicographically sortable by creation time and collision-free without coordination, which is what makes two concurrent writers safe with one file per unit. This is the file identity; it is NOT the address."
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "reference",
+        "question",
+        "constraint",
+        "entity",
+        "decision",
+        "lesson",
+        "iteration",
+        "task"
+      ],
+      "description": "Closed enum. Domain packs extend via `subtype`, never by adding a `type`: a new type would change resolution semantics for every existing reader, which the additive-only rule forbids."
+    },
+    "subtype": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Free-form refinement of `type`, owned by a domain pack (e.g. `adr`, `sme-call`, `runbook`). Carries no resolution semantics \u2014 the cascade MUST NOT branch on it."
+    },
+    "scope": {
+      "type": "string",
+      "pattern": "^(session:[0-7][0-9A-HJKMNP-TV-Z]{25}|task:[0-7][0-9A-HJKMNP-TV-Z]{25}|repo:[a-z0-9][a-z0-9-]*|[a-z0-9][a-z0-9-]*)$",
+      "description": "The scope this unit belongs to, as a scope-name in the addressing grammar. `session:<ulid>` and `task:<ulid>` are ephemeral; `repo:<slug>` is the phase-1 durable scope; a bare slug names an entry declared in the repo's `scope-chain.yaml`. Narrower scopes win during resolution \u2014 see SPEC.md \u00a73."
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Stable kebab-case identifier and the last segment of the unit's address. Exactly one unit per (scope, type, slug) may be `active` at a time; every other unit sharing that triple must be `draft`, `superseded` or `retired`. A superseding unit DELIBERATELY REUSES the slug of the unit it replaces \u2014 that is what keeps the address stable and inbound citations pointing at the current answer. Reusing a wider scope's slug is also how a narrow scope shadows it. Renaming a slug creates a different claim, not a new version."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One-line human summary. Shown in recall output; not parsed."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "superseded",
+        "retired"
+      ],
+      "description": "`draft` is not returned by recall. `active` is. `superseded` is set when another unit in the SAME scope names this one in its `supersedes`. `retired` means deliberately withdrawn with no replacement. Units are never deleted \u2014 the corpus is a git history and a deleted unit breaks inbound citations."
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC creation timestamp. Redundant with the ULID's embedded time, and kept because a human reading the file should not have to decode base32."
+    },
+    "updated": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of the last body edit. Null or absent if never edited."
+    },
+    "alias": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z][A-Z0-9]*-[0-9]+$",
+      "description": "Optional human-facing identifier such as `DEC-014`, unique within its scope, assigned at merge time rather than at authoring time so two open PRs cannot claim the same number. Resolvable by `GET /v1/smriti/units/{id}` alongside the ULID."
+    },
+    "cites": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/prajnaUri"
+      },
+      "uniqueItems": true,
+      "description": "Addresses of the units this one rests on. Every entry MUST resolve. A `decision`'s transitive cite closure MUST reach at least one `reference` \u2014 that is the rule the name Pramana refers to: a claim with no evidence behind it is not admissible."
+    },
+    "supersedes": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+      "description": "ULID of the unit this one replaces. A ULID and NOT an address, because supersession is a statement about a specific file whereas an address names a claim: within a chain every unit shares one address, so an address here would be self-referential and unresolvable. The named unit MUST be in the SAME scope and have the SAME type and slug. Cross-scope override is what the cascade already does, and expressing it as a supersedes would let a narrow scope silently mutate a broad one."
+    },
+    "superseded_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+      "description": "Back-pointer, maintained by the writer for cheap traversal. Derivable from the forward `supersedes` edges, so a reader that disagrees MUST trust `supersedes` and treat this as a hint."
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "description": "Free-form labels for filtering. No resolution semantics."
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance",
+      "description": "REQUIRED on `reference` units, forbidden nowhere else. See the conditional at the bottom of this schema."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "reference"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "provenance"
+        ],
+        "description": "A `reference` is the only unit type that asserts an external fact, so it is the only one that must carry evidence of where the fact came from and that it was scanned before it entered git. This is the one-way door: `reference` units are immutable and land in git history, and a transcript containing PHI committed once cannot be redacted afterward without rewriting history across every clone."
+      }
+    }
+  ],
+  "$defs": {
+    "prajnaUri": {
+      "type": "string",
+      "pattern": "^prajna://(session:[0-7][0-9A-HJKMNP-TV-Z]{25}|task:[0-7][0-9A-HJKMNP-TV-Z]{25}|repo:[a-z0-9][a-z0-9-]*|[a-z0-9][a-z0-9-]*)/(reference|question|constraint|entity|decision|lesson|iteration|task)/[a-z0-9][a-z0-9-]*$",
+      "description": "`prajna://<scope-name>/<type>/<slug>`. Addresses the logical unit, never the file: the ULID does not appear."
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "source",
+        "sha256",
+        "captured_at",
+        "captured_by",
+        "redaction"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the material came from, precisely enough to go back to it: a URL, a file path, `jira:PROJ-123`, `call:2026-07-12-sme`."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Hex sha256 of the captured material AFTER redaction \u2014 the bytes that actually entered the corpus. Hashing the pre-redaction bytes would put a verifiable fingerprint of the sensitive material into git, which is the thing redaction exists to prevent."
+        },
+        "captured_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 UTC capture time."
+        },
+        "captured_by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Who or what captured it: `user:jags`, `agent:code-1`, `indexer:confluence`."
+        },
+        "redaction": {
+          "type": "object",
+          "required": [
+            "scanned_at",
+            "detector_version",
+            "span_count",
+            "mode"
+          ],
+          "additionalProperties": false,
+          "description": "The redaction verdict. Its presence is mandatory and non-configurable: severity and mode are tunable, existence is not, because a compliance control that can be switched off is not a control. \"Scanned, 3 spans masked, mode=hash\" is the sentence that makes the audit trail worth having.",
+          "properties": {
+            "scanned_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 UTC scan time. MUST be at or before `captured_at`'s commit \u2014 the scan happens before the write, never after."
+            },
+            "detector_version": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Version of the detector pattern set that produced this verdict. Named so a later pattern improvement can identify which units were scanned by a weaker detector."
+            },
+            "span_count": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of sensitive spans found. Zero is a valid, meaningful verdict: it records that a scan happened and found nothing, which is different from no scan."
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "hash",
+                "mask",
+                "drop"
+              ],
+              "description": "What was done with the spans found. `hash` replaces with a stable digest (still joinable), `mask` with a fixed placeholder (not joinable), `drop` removes the surrounding content entirely."
+            },
+            "blocked": {
+              "type": "boolean",
+              "description": "True when the scan refused the capture outright rather than redacting it. A blocked capture produces no unit, so this appears only in journal events, never in a committed unit."
+            }
+          }
+        }
+      }
+    }
+  }
+}

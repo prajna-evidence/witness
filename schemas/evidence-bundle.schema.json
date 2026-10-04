@@ -1,0 +1,503 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evidence-bundle.schema.json",
+  "title": "EvidenceBundle",
+  "description": "The artifact emitted for one change that reaches a pull request. Written to <repo>/.witness/evidence/<id>.evidence.json, committed on the branch, so it is reviewed with the change it describes.\n\nWHAT IT IS FOR. Not a log. A log is what a tool says about itself; this is meant to be checkable by someone who does not trust the tool. `witness verify` re-derives what it can with the network disabled, and says plainly which claims it could not check rather than passing them.\n\nRELATIONSHIP TO provenance.schema.json v1. This is a deliberate widening of Prajna's first-party artifact, not a copy. Four of that schema's required fields are unknowable from outside the runner that produced them: `model_turns[].transport` is an enum of three bring-your-own-key transports (a Copilot or Codex turn is none of them), `redaction` needs our detector, `pramana.chain_head` needs our append-only journal, and `memory` needs Smriti addresses. Each is loosened below with the reason recorded inline. SPEC.md section 5.1 tabulates the full set.\n\nTWO PROPERTIES ARE KEPT UNCHANGED AND ARE NOT NEGOTIABLE, because they are what make this evidence rather than assertion:\n1. File hashes come from the GIT TREE OBJECT at `commit_sha`, never the working tree. Verifying against the working copy passes exactly once - the tree moves and later commits change the bytes - and an artifact that only verifies on the day it was made is not evidence.\n2. Whatever anchor exists is committed here and pushed, so it lives outside the store it attests to.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "generated_at",
+    "generated_by",
+    "tier_floor",
+    "commit_sha",
+    "anchors",
+    "repo",
+    "sources",
+    "observations",
+    "files",
+    "gates",
+    "model_turns",
+    "unavailable"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 2,
+      "description": "Bundle format version."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+      "description": "ULID identifying this bundle, and the basename of its file. Lexicographically sortable by creation time, which is what makes a directory listing of .witness/evidence/ chronological without parsing anything."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC time the bundle was assembled."
+    },
+    "generated_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Version of the assembling build, e.g. `witness/0.2.0`. Names what to re-run to reproduce."
+    },
+    "tier_floor": {
+      "$ref": "common.schema.json#/$defs/tier",
+      "description": "The LOWEST tier among the sections a reader would rely on.\n\nA bundle MUST NOT advertise a single aggregate tier (decision S2, SPEC.md section 4.3) - every realistic bundle mixes tier B file hashes with tier C model data, and collapsing that to one number is the precise dishonesty this format exists to prevent. This field is a floor, not a summary: it says 'nothing here is better attested than X', which is the statement an auditor can safely act on.\n\nA schema cannot check that this equals the minimum of the per-section tiers. `witness verify` does, and a bundle that overstates itself fails."
+    },
+    "commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The commit whose tree the `files` hashes were taken from. A LOCATOR, NOT A DURABLE FACT (decision S15): it does not survive a squash or rebase merge, and once the branch is deleted it is unreferenced. Verification resolves each path against this tree when the commit is still reachable, and falls back to the content hashes in `files` when it is not. A bundle whose commit_sha has died still verifies its content claims; the dead locator is reported as such and never treated as a content failure."
+    },
+    "anchors": {
+      "type": "object",
+      "description": "Anchoring that survives the merge strategies commit_sha does not (S15). Separates locating a change from verifying its content, because they fail differently and must be reported differently.",
+      "additionalProperties": false,
+      "required": [
+        "base_commit",
+        "base_tree",
+        "patch_id",
+        "merge_commit"
+      ],
+      "properties": {
+        "base_commit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Commit the diff was taken against. Null for a root commit, which is a real case and not an error."
+        },
+        "base_tree": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Tree object of base_commit. Tier B: re-derivable from the repository, stable across a rebase onto an unchanged base."
+        },
+        "patch_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`git patch-id --stable` of the branch diff. TIER C AND IT STAYS THERE - a correlation hint, never an identity. Stable across rebase; NOT stable across a squash of more than one commit, which yields the combined diff whose patch-id matches none of the originals. Nothing may use this to decide two changes are the same change. Null when the diff is empty."
+        },
+        "merge_commit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the change actually landed, written by a post-merge reconciliation pass. Null until then, which is the normal state for a bundle committed in an open pull request. Tier B when read from the host's merge event, C when inferred locally."
+        }
+      }
+    },
+    "repo": {
+      "type": "object",
+      "required": [
+        "slug",
+        "branch"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Repository slug."
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Branch the bundle was committed on."
+        },
+        "remote": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Remote URL, or null. Null is a first-class case and not degraded mode: a local-only repo with no upstream must still produce a valid bundle. Note that at tier C the anchoring value of a push is exactly what a null remote gives up."
+        },
+        "pr_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Pull request URL once opened, else null."
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Every distinct source that contributed, deduplicated - the provenance of the provenance. Present so a reader can see at a glance which hosts and channels were in play without walking every observation.",
+      "items": {
+        "$ref": "common.schema.json#/$defs/source"
+      }
+    },
+    "observations": {
+      "type": "array",
+      "description": "The normalised records this bundle was assembled from, in timestamp order. MAY be empty only when the bundle carries a pointer to externally stored observations; an empty array with no such pointer is a bundle that asserts things it cannot show.",
+      "items": {
+        "$ref": "observation.schema.json"
+      }
+    },
+    "model_turns": {
+      "type": "array",
+      "minItems": 0,
+      "description": "One entry per model turn, in order.\n\nWIDENED FROM v1, which required minItems 1. A host audit log records that an agent session occurred and nothing about its turns; requiring at least one turn would force an adapter to fabricate one. An empty array is therefore permitted, and constrained below: it is only honest when the bundle's floor is already C.",
+      "items": {
+        "type": "object",
+        "required": [
+          "seq",
+          "at",
+          "host"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based turn index."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "phase": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SDLC phase of the turn. Conventionally intent, plan, code, build, review, deploy or monitor; the AI-DLC phase map (docs/adapters.md) folds Inception/Construction/Operations onto these."
+          },
+          "host": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Which agent host carried the turn. WIDENED FROM v1: `transport` alone was an enum of our own three BYOK transports, which cannot name a Copilot or Codex turn at all."
+          },
+          "transport": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How the turn reached the model within that host, when known - `api-key`, `agent-sdk`, `claude-cli`, or a host-native value. Open string rather than an enum, because the same model reached by a different transport has a different key-custody story and we would rather record an unfamiliar one than drop it."
+          },
+          "model_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact model identifier as reported by the host, e.g. `claude-opus-5`. Not a friendly name - an auditor asking 'which model' means this string. Null when the host does not disclose it, which is the normal case for an enterprise audit log."
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reasoning-effort setting, when the host exposes one."
+          },
+          "tokens": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "input",
+              "output"
+            ],
+            "description": "WIDENED FROM v1, which required this object. Null when the host does not emit token accounting, with the reason recorded in the bundle's `unavailable` map. Null is a true statement about the limits of the evidence; {input: 0, output: 0} is a false one, and a reader cannot tell it from a genuinely free turn.",
+            "properties": {
+              "input": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "output": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cache_read": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cache_write": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "cost_usd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Local ESTIMATE from a price table, never a billed amount. See `cost.disclaimer`."
+          },
+          "injected_units": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "vendor/memory-unit.schema.json#/$defs/prajnaUri"
+            },
+            "description": "Smriti unit addresses injected into this turn's prompt, in injection order. Null on every host that has no Smriti, which is every host except our own runner."
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "description": "Every file the change wrote, with the sha256 of its content in the tree at `commit_sha`.",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "sha256",
+          "action"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repo-relative POSIX path."
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "sha256 of the file bytes as stored at `commit_sha`. NOT the git blob id, which prefixes a header and uses sha1 in most repos."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "created",
+              "modified",
+              "deleted"
+            ],
+            "description": "For `deleted`, `sha256` is the hash of the content as it stood before deletion, taken from the parent commit."
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "description": "Every approval boundary the change crossed, in order. An empty array is valid and meaningful: it asserts the change crossed no gated boundary, which a verifier cross-checks against the observations.",
+      "items": {
+        "type": "object",
+        "required": [
+          "gate",
+          "decision",
+          "at",
+          "tier"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "gate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Gate name, e.g. `plan`, `deploy`, `no-prod`, `pr-review`."
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "denied",
+              "auto_approved",
+              "expired"
+            ],
+            "description": "`auto_approved` is distinguished from `approved` deliberately: a human approval and a policy override are not the same evidence, and collapsing them is how an audit trail becomes worthless."
+          },
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Who decided. Null only for `auto_approved` and `expired`, where no human acted."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Free text supplied by the approver or the policy."
+          },
+          "tier": {
+            "$ref": "common.schema.json#/$defs/tier",
+            "description": "Per-gate tier. A PR approval read from the GitHub API is tier B; a local gate our own runner recorded is tier A; a gate an agent reports having honoured is tier C. These routinely differ within one bundle, which is why S2 forbids a single aggregate."
+          }
+        }
+      }
+    },
+    "cost": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "total_usd",
+        "disclaimer"
+      ],
+      "additionalProperties": false,
+      "description": "Null when no contributing host emitted cost data.",
+      "properties": {
+        "total_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Sum of per-turn estimates."
+        },
+        "disclaimer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "MUST state that the figure is a local estimate from a price table and that the provider's invoice is authoritative. Present so a reader cannot mistake it for a billed amount."
+        }
+      }
+    },
+    "redaction": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "detector_version",
+        "scans",
+        "spans_found",
+        "blocked_count"
+      ],
+      "additionalProperties": false,
+      "description": "WIDENED FROM v1, which required this object. Null asserts that NO REDACTION WAS PERFORMED BY US - which is the truth on every foreign host, and is itself a finding an auditor can act on rather than an absence to be glossed. When present, `scans: 0` carries the same weight for the same reason.",
+      "properties": {
+        "detector_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scans": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "spans_found": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "hash",
+              "mask",
+              "drop"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "memory": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "units_injected",
+        "units_written"
+      ],
+      "additionalProperties": false,
+      "description": "WIDENED FROM v1, which required this object. Null on every host without Smriti. Present only at tier A.",
+      "properties": {
+        "units_injected": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "vendor/memory-unit.schema.json#/$defs/prajnaUri"
+          }
+        },
+        "units_written": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "vendor/memory-unit.schema.json#/$defs/prajnaUri"
+          }
+        },
+        "cite_closure": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "vendor/memory-unit.schema.json#/$defs/prajnaUri"
+          },
+          "description": "Transitive closure of `cites` from every injected unit - the signal-to-decision chain. Re-walked against the corpus by the verifier rather than trusted."
+        }
+      }
+    },
+    "pramana": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "first_audit_id",
+        "last_audit_id",
+        "event_count",
+        "chain_head"
+      ],
+      "additionalProperties": false,
+      "description": "WIDENED FROM v1, which required this object. TIER A ONLY - it needs our own append-only journal, and no foreign host has one. Null everywhere else.",
+      "properties": {
+        "first_audit_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "last_audit_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chain_head": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "THE ANCHOR. `entry_hash` of the journal's last row at assembly time, committed here into git and pushed to a store the tool does not control. Without this the hash chain proves only internal self-consistency, which anyone able to edit the database can always restore."
+        }
+      }
+    },
+    "unavailable": {
+      "$ref": "common.schema.json#/$defs/unavailable"
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "REMOVED, B4: a rule here once required tier_floor=C whenever model_turns was empty, on the reasoning that a bundle with no model turns knows nothing about what the model did. That reasoning is correct about model turns specifically and wrong as a bundle-wide rule - the W4 GitHub Actions adapter can contribute a genuine tier B build-provenance claim (a gate and an observation, both tiered) to a bundle with zero agent activity and therefore an empty model_turns, and such a bundle legitimately has tier_floor B for that claim. A schema cannot tell 'no agent ran' apart from 'an agent ran and a foreign host recorded nothing about it' from the shape of `model_turns` alone - conflating the two back into one bundle-wide floor is exactly the S2 mistake this format exists to prevent, just written into the schema instead of the assembler. `witness verify`'s tier_floor check (verify.py, SPEC.md section 6.1.3) now does the general, correct version of this: it recomputes the floor from every section's own declared tier and fails a bundle that overstates itself, with no assumption about which section produced the evidence. See tests/test_verify.py's test_empty_model_turns_must_not_claim_above_c for the case this used to catch, still caught, at the right layer."
+    },
+    {
+      "if": {
+        "properties": {
+          "pramana": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "pramana"
+        ]
+      },
+      "then": {
+        "properties": {
+          "tier_floor": {
+            "const": "A"
+          }
+        },
+        "$comment": "The journal anchor exists only where our own runner produced the record, and a bundle carrying it should not be understating itself either."
+      }
+    }
+  ]
+}
