@@ -20,6 +20,8 @@ import re
 import subprocess
 from typing import Any, Callable
 
+from witness.gitrepo import owner_name
+
 Runner = Callable[..., "subprocess.CompletedProcess[str]"]
 
 
@@ -132,9 +134,26 @@ def collect_via_verify(
     }
 
 
+#: Exactly `owner/name` (no extra path segments or query), so the repo compared against
+#: the bundle is the repo the API call actually reaches. Dot-segments are rejected in
+#: `_locator`, since a path like `a/..` would be normalised to somewhere else.
 _RETRIEVABLE_FROM_RE = re.compile(
-    r"^https://api\.github\.com/repos/(?P<repo>.+)/attestations/(?P<digest>sha256:[0-9a-f]+)$"
+    r"^https://api\.github\.com/repos/(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)"
+    r"/attestations/(?P<digest>sha256:[0-9a-f]+)$"
 )
+
+
+def _locator(url: str) -> "re.Match[str] | None":
+    match = _RETRIEVABLE_FROM_RE.match(url)
+    if match and any(part in (".", "..") for part in match["repo"].split("/")):
+        return None
+    return match
+
+
+def _bundle_repo(bundle: dict) -> "str | None":
+    """`owner/name` of the repository the bundle is about, from its remote."""
+    remote = (bundle.get("repo") or {}).get("remote")
+    return owner_name(remote) if remote else None
 
 
 def _claimed_existence(bundle: dict, url: str) -> "bool | None":
@@ -175,9 +194,21 @@ def online_verify(source: dict, bundle: dict, *, runner: "Runner | None" = None)
     file get right is that `contradicted` never fires on an inconclusive signal.
     """
     url = source.get("retrievable_from") or ""
-    match = _RETRIEVABLE_FROM_RE.match(url)
+    match = _locator(url)
     if not match:
         return {"outcome": "unreachable", "reason": f"cannot parse retrievable_from: {url!r}"}
+
+    # Anyone can attest a digest in a repository they own. Without this binding a
+    # bundle could point its tier B claim at such a repository and have it confirmed.
+    # GitHub owner and repository names are case-insensitive.
+    expected = _bundle_repo(bundle)
+    if expected is None:
+        return {"outcome": "unreachable", "reason": "bundle names no remote to bind the locator to"}
+    if match["repo"].lower() != expected.lower():
+        return {
+            "outcome": "contradicted",
+            "reason": f"locator names repository {match['repo']!r}, but the bundle is for {expected!r}",
+        }
 
     claimed = _claimed_existence(bundle, url)
     if claimed is None:

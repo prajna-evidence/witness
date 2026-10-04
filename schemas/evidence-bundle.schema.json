@@ -102,8 +102,8 @@
       "properties": {
         "slug": {
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*$",
-          "description": "Repository slug."
+          "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)?$",
+          "description": "Repository slug: `owner/name` from the remote when there is one, else the directory name. Widened from `^[a-z0-9][a-z0-9-]*$`, which rejected every bundle from a repository with a remote (decisions.md S22); every value the old pattern accepted is still accepted."
         },
         "branch": {
           "type": "string",

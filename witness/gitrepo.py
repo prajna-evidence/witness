@@ -246,12 +246,19 @@ def slug(root: Path) -> str:
     url = remote_url(root)
     if not url:
         return root.resolve().name
+    return owner_name(url)
+
+
+def owner_name(url: str) -> str:
+    """`owner/name` from a remote URL (https or scp-style); the input when it has no two parts."""
     trimmed = url[:-4] if url.endswith(".git") else url
     parts = [p for p in trimmed.replace(":", "/").split("/") if p]
     return "/".join(parts[-2:]) if len(parts) >= 2 else trimmed
 
 
-def find_containing_commit(root: Path, path: str, sha256: str, limit: int = 500) -> "str | None":
+def find_containing_commit(
+    root: Path, path: str, sha256: str, limit: int = 500, after: "str | None" = None
+) -> "str | None":
     """Newest commit reachable from HEAD whose tree holds `path` with content `sha256`.
 
     This is the recovery path for a dead `commit_sha`. After a squash merge and branch
@@ -261,9 +268,12 @@ def find_containing_commit(root: Path, path: str, sha256: str, limit: int = 500)
     separately, and the bundle is never rewritten to hide the difference.
 
     Bounded because it walks history. A miss returns None and the claim degrades honestly.
+    `after` excludes that commit and its ancestors, so only content produced after it
+    can match.
     """
+    revs_spec = ["HEAD", f"^{after}"] if after else ["HEAD"]
     try:
-        revs = _run(root, "rev-list", f"--max-count={limit}", "HEAD", "--", path).split()
+        revs = _run(root, "rev-list", f"--max-count={limit}", *revs_spec, "--", path).split()
     except GitError:
         return None
     for rev in revs:

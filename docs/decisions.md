@@ -603,3 +603,33 @@ required was run: links into private workspaces were removed, `SPEC.md` §10 now
 tracker, and history was squashed to a single commit. The squash was required, not cosmetic: S14
 stated that the removed pricing entry was gone from history, and it was not. Rationale from the
 squashed commits survives here, which is what this file is for.
+
+## S22 — Three verifier bypasses closed before publication; `repo.slug` widened
+
+**Status:** locked, 2026-10-04. **Amends** S15 (recovery), S17 (floor computation) and S19
+(online re-fetch). Normative in `SPEC.md` §6.1 and §6.2.
+
+A security review run before publication found three ways a forged bundle passed `witness verify`.
+Each was reproduced against the shipped code, then fixed with a regression test that fails without it:
+
+1. **Floor computed from the summary, not the claims.** `check_tier_floor` read `sources` and
+   `gates` only. Dropping tier C entries from `sources` while keeping the tier C observations
+   produced a bundle that declared `tier_floor: B` and passed: S2's violation, through the one
+   check meant to catch it. Observation tiers now count, and an observation whose source is
+   missing from `sources` is reported.
+2. **Online re-fetch was not bound to the subject.** `online_verify` re-fetched whatever repository
+   `retrievable_from` named. Anyone can attest a digest in a repository they own, so a claim
+   pointed there came back `confirmed`. The locator must now name exactly one `owner/name`, which
+   must equal the repository from `repo.remote`. A mismatch is `contradicted`, an unbindable
+   locator `unreachable`.
+3. **Recovery was unbounded.** S15's dead-locator recovery searched all of HEAD's history, so a
+   bundle naming a commit that never existed matched any version a file ever had, including
+   content from before the change. Recovery now only considers commits after a reachable
+   `base_commit`. A squash commit always descends from its base, so S15's case survives.
+
+**Found alongside, and fixed in the same change:** the schema's `repo.slug` pattern
+(`^[a-z0-9][a-z0-9-]*$`) rejected the `owner/name` that `gitrepo.slug` writes whenever a repository
+has a remote, so every bundle from a real repository failed verification. No test repository had a
+remote. The pattern is widened to `^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)?$`. That is additive under
+§9: every value the old pattern accepted is still accepted.
+

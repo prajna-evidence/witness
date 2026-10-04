@@ -199,8 +199,14 @@ def _check_file(root: pathlib.Path, entry: dict, commit_sha: str, base_commit: "
     # which is exactly the case a squash-merge-then-delete produces. Not attempted for
     # `deleted` files: their content only ever lived at the base, and searching HEAD's
     # history for a path that was removed is not the same question.
-    if action != "deleted":
-        recovered = gitrepo.find_containing_commit(root, path, expected)
+    #
+    # Bounded to commits after a reachable base_commit. Unbounded, a bundle could name
+    # a commit that never existed and have any historical version of a file "match" -
+    # including content from before the change it describes. A squash commit is always
+    # a descendant of the base it was taken against, so the legitimate case survives.
+    # No reachable base (null, or itself dead) means no bound, so no recovery.
+    if action != "deleted" and base_commit and gitrepo.exists(root, base_commit):
+        recovered = gitrepo.find_containing_commit(root, path, expected, after=base_commit)
         if recovered:
             return {"path": path, "action": action, "outcome": "match", "checked_at": "recovered", "commit": recovered}
 
@@ -227,12 +233,27 @@ def check_content(bundle: dict, root: pathlib.Path) -> dict[str, Any]:
 
 def check_tier_floor(bundle: dict) -> dict[str, Any]:
     declared = bundle.get("tier_floor")
-    section_tiers = [s["tier"] for s in bundle.get("sources") or [] if s.get("tier")] + [
-        g["tier"] for g in bundle.get("gates") or [] if g.get("tier")
-    ]
+    sources = bundle.get("sources") or []
+    observation_sources = [o.get("source") or {} for o in bundle.get("observations") or []]
+    # Observations are where each claim's tier actually lives; `sources` is only their
+    # deduplicated summary. Computing the floor from the summary alone let a bundle drop
+    # its tier C entries from `sources` while keeping the tier C observations, and pass
+    # with an overstated floor - the S2 violation this check exists to catch.
+    section_tiers = (
+        [s["tier"] for s in sources if s.get("tier")]
+        + [g["tier"] for g in bundle.get("gates") or [] if g.get("tier")]
+        + [s["tier"] for s in observation_sources if s.get("tier")]
+    )
     computed = tiers.tier_floor(section_tiers)
 
     notes: list[str] = []
+    listed = {(s.get("host"), s.get("channel"), s.get("tier")) for s in sources}
+    unlisted = sorted(
+        {(s.get("host"), s.get("channel"), s.get("tier")) for s in observation_sources} - listed,
+        key=str,
+    )
+    for host, channel, tier in unlisted:
+        notes.append(f"observation source {host}:{channel} (tier {tier}) is missing from sources")
     # `pramana` present -> A is the one schema-level allOf rule that survived S17: it is
     # unconditionally true regardless of adapter, not a proxy for a general check, so it
     # is re-checked here too. Its sibling - empty model_turns -> C - is deliberately

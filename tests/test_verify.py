@@ -538,3 +538,72 @@ def test_a_verifier_that_raises_degrades_rather_than_crashing(repo: pathlib.Path
 
     assert report["online"][0]["outcome"] == "unreachable"
     assert report["ok"]
+
+
+# ---- forged-bundle regressions ------------------------------------------------------
+# Each of these passed verification before the fix named in its docstring.
+
+
+def _old_content_hash(repo: pathlib.Path) -> str:
+    """Hash of src/refund.py as first committed, then advance it so HEAD differs."""
+    old = gitrepo.sha256_at(repo, "HEAD", "src/refund.py")
+    write(repo, "src/refund.py", "def refund():\n    return 2\n")
+    git(repo, "commit", "-qam", "change refund")
+    return old
+
+
+def test_a_fabricated_commit_cannot_recover_content_from_before_the_base(repo: pathlib.Path) -> None:
+    """Recovery used to search all of HEAD's history, so a bundle naming a commit that
+    never existed matched any version of a file the repository ever held."""
+    doc = build(repo)
+    doc["commit_sha"] = "f" * 40
+    doc["anchors"]["base_commit"] = gitrepo.resolve(repo, "HEAD")  # old content predates it
+    doc["files"] = [{"path": "src/refund.py", "sha256": _old_content_hash(repo), "action": "modified"}]
+
+    report = verify.verify_offline(doc, repo)
+    assert report["content"]["results"][0]["outcome"] == "absent"
+    assert not report["ok"]
+
+
+def test_no_recovery_without_a_reachable_base(repo: pathlib.Path) -> None:
+    """With no base to bound the search, recovery could match anything, so it is not attempted."""
+    doc = build(repo)
+    doc["commit_sha"] = "f" * 40
+    doc["anchors"]["base_commit"] = None
+    doc["files"] = [{"path": "src/refund.py", "sha256": _old_content_hash(repo), "action": "modified"}]
+
+    report = verify.verify_offline(doc, repo)
+    assert report["content"]["results"][0]["outcome"] == "absent"
+
+
+def test_tier_floor_counts_observation_tiers_not_just_the_sources_summary(repo: pathlib.Path) -> None:
+    """The floor used to be computed from `sources` and `gates` only, so dropping the
+    tier C entry from `sources` while keeping tier C observations overstated the floor."""
+    doc = build(repo)
+    doc["observations"].append(
+        {**(doc["observations"][0] if doc["observations"] else {}),
+         "source": {"host": "claude-code", "channel": "hook", "tier": "C",
+                    "collected_at": "2026-09-20T12:00:00Z", "retrievable_from": None,
+                    "adapter_version": "claudecode/0.1.0"}}
+    )
+    doc["sources"] = [
+        {"host": "github-actions", "channel": "attestation", "tier": "B",
+         "collected_at": "2026-09-20T12:00:00Z",
+         "retrievable_from": "https://api.github.com/repos/o/r/attestations/sha256:aa",
+         "adapter_version": "githubactions/0.1.0"}
+    ]
+    doc["gates"] = []
+    doc["tier_floor"] = "B"
+
+    floor = verify.check_tier_floor(doc)
+    assert floor["computed"] == tiers.TIER_SELF_REPORTED
+    assert not floor["ok"]
+    assert any("claude-code:hook (tier C) is missing from sources" in n for n in floor["notes"])
+
+
+def test_a_bundle_from_a_repo_with_a_remote_passes_the_schema(repo: pathlib.Path) -> None:
+    """`repo.slug` is `owner/name` whenever there is a remote; the schema used to reject it."""
+    git(repo, "remote", "add", "origin", "git@github.com:Acme/payments-service.git")
+    doc = build(repo)
+    assert doc["repo"]["slug"] == "Acme/payments-service"
+    assert verify.check_schema(doc)["ok"], verify.check_schema(doc)["errors"]

@@ -187,6 +187,7 @@ def test_bundle_assemble_folds_in_an_attestation(monkeypatch: pytest.MonkeyPatch
              "PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": str(r)},
     )
     _git("init", "-q", "-b", "main")
+    _git("remote", "add", "origin", f"https://github.com/{REPO}.git")
     (r / "f.txt").write_text("1\n")
     _git("add", "-A")
     _git("commit", "-qm", "base")
@@ -214,8 +215,8 @@ def test_bundle_assemble_folds_in_an_attestation(monkeypatch: pytest.MonkeyPatch
 # ---- online_verify (S19: wiring `--online` to something real for this channel) --------
 
 
-def _bundle_with(observation: dict) -> dict:
-    return {"observations": [observation]}
+def _bundle_with(observation: dict, remote: str = f"git@github.com:{REPO}.git") -> dict:
+    return {"repo": {"remote": remote}, "observations": [observation]}
 
 
 def test_online_verify_confirms_existence_that_still_matches() -> None:
@@ -303,6 +304,7 @@ def test_verify_online_reaches_the_real_github_actions_verifier_end_to_end(
              "PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": str(r)},
     )
     _git("init", "-q", "-b", "main")
+    _git("remote", "add", "origin", f"https://github.com/{REPO}.git")
     (r / "f.txt").write_text("1\n")
     _git("add", "-A")
     _git("commit", "-qm", "base")
@@ -323,3 +325,53 @@ def test_verify_online_reaches_the_real_github_actions_verifier_end_to_end(
         {"source": {"host": "github-actions", "channel": "attestation"}, "outcome": "confirmed"}
     ]
     assert report["ok"]
+
+
+# ---- binding a tier B locator to the bundle's own repository -------------------------
+
+
+def _found_observation(repo: str = REPO) -> dict:
+    record = {"repo": repo, "digest": DIGEST, "exists": True, "predicate_types": ["x"], "count": 1, "error": None}
+    return normalize_attestation(record, "2026-09-23T00:00:00Z")["observation"]
+
+
+_FOUND = json.dumps({"attestations": [{"bundle": {"dsseEnvelope": {"payload": _dsse_payload("x")}}}]})
+
+
+def test_online_verify_contradicts_a_locator_for_another_repository() -> None:
+    """Anyone can attest a digest in a repository they own. Before the binding, a bundle
+    pointing its claim at such a repository came back `confirmed`."""
+    observation = _found_observation("attacker/anything")
+    calls: list = []
+
+    outcome = githubactions.online_verify(
+        observation["source"], _bundle_with(observation),
+        runner=lambda args: calls.append(args) or _proc(0, stdout=_FOUND),
+    )
+    assert outcome["outcome"] == "contradicted"
+    assert "attacker/anything" in outcome["reason"]
+    assert calls == [], "a mismatched repository must be rejected before any re-fetch"
+
+
+def test_online_verify_matches_repository_names_case_insensitively() -> None:
+    observation = _found_observation()
+    outcome = githubactions.online_verify(
+        observation["source"], _bundle_with(observation, remote=f"https://github.com/{REPO.upper()}.git"),
+        runner=lambda args: _proc(0, stdout=_FOUND),
+    )
+    assert outcome == {"outcome": "confirmed"}
+
+
+def test_online_verify_cannot_bind_a_bundle_with_no_remote() -> None:
+    observation = _found_observation()
+    bundle_doc = {"repo": {"remote": None}, "observations": [observation]}
+    outcome = githubactions.online_verify(observation["source"], bundle_doc, runner=lambda args: _proc(0, stdout=_FOUND))
+    assert outcome["outcome"] == "unreachable"
+
+
+@pytest.mark.parametrize("repo_part", [f"{REPO}/..", "../octo", f"{REPO}/extra", f"{REPO}?x=1"])
+def test_online_verify_rejects_locators_that_do_not_name_exactly_one_repository(repo_part: str) -> None:
+    source = {"retrievable_from": f"https://api.github.com/repos/{repo_part}/attestations/{DIGEST}"}
+    outcome = githubactions.online_verify(source, {"repo": {"remote": f"git@github.com:{REPO}.git"}, "observations": []})
+    assert outcome["outcome"] == "unreachable"
+    assert "cannot parse" in outcome["reason"]

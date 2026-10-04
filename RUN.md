@@ -306,7 +306,7 @@ longer a separate hand-rolled path for checking a bundle you produced yourself.
 ## 5. Running the project's own tests
 
 ```bash
-python3 -m pytest -q                 # 137 passed in ~30s
+python3 -m pytest -q                 # 169 passed in ~40s
 bash scripts/validate.sh             # schemas, examples, rejected-example corpus, vendored pin
 bash conformance/claudecode/check.sh # byte-for-byte fixture reproduction
 ```

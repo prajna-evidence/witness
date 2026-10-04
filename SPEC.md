@@ -216,9 +216,12 @@ Runs with the network disabled. Checks:
 
 1. The bundle validates against its schema.
 2. Every `files[].sha256` matches the content of that path in the git tree at `commit_sha`
-   (`git cat-file`), on any clone, at any later date.
-3. `tier_floor` equals the minimum of the per-section tiers — i.e. the bundle does not
-   overstate itself.
+   (`git cat-file`), on any clone, at any later date. When that commit is unreachable (S15), a
+   verifier MAY recover the match from a later commit, but only one that descends from a reachable
+   `anchors.base_commit`; with no reachable base it MUST NOT recover. Content from before the base
+   is never evidence of the change.
+3. `tier_floor` equals the minimum of the per-section tiers, observations included — i.e. the
+   bundle does not overstate itself. Every observation's source MUST also appear in `sources`.
 4. Every `null` field has a corresponding `unavailable` reason from the closed list (§3.3).
 5. At tier A only: the hash chain is continuous and terminates at the recorded `chain_head`.
 
@@ -230,6 +233,11 @@ organised against.
 
 Additionally re-fetches each tier B claim from `source.retrievable_from` and compares. Output MUST
 distinguish four outcomes per claim: `confirmed`, `contradicted`, `unreachable`, `out_of_retention`.
+
+A locator MUST be bound to the bundle's own repository before it is re-fetched. A locator naming a
+different repository is `contradicted`; one that cannot be bound (no remote, or not exactly one
+repository) is `unreachable`. Otherwise a third party's record about someone else's repository
+would confirm a claim about this one.
 
 `contradicted` is the only finding that fails a bundle. `unreachable` and `out_of_retention`
 degrade the claim to tier C and lower `tier_floor` accordingly — a host's retention policy is not
